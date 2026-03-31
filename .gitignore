@@ -1,1 +1,12 @@
+# macOS
 .DS_Store
+
+# Python / Tests
+venv/
+.env
+__pycache__/
+.pytest_cache/
+
+# IDEs
+.idea/
+.vscode/
