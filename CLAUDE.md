@@ -36,6 +36,7 @@ offer_of_a_lifetime/
    After each card: `ResultPopup` shows card info + bonuses. After the 4th popup closes → `StartPlayingPhase()`.
 
 2. **Playing phase** — player clicks action cards. Each costs `moneyCost` + `timeCostDays`, triggers d20 roll vs `targetRoll`. After each action: `ResultPopup` shows roll result. On close → `CheckGameOver()`.
+   Mini cards in PlayerBar are tappable: shows `ResultPopup` with card backstory (informational only, no dice roll).
 
 **Win condition:** `currentMoney >= targetMoney` (default 1000$) → `GameOverPanel` win.
 **Lose condition:** `currentDays <= 0` after spending → `GameOverPanel` lose.
@@ -49,8 +50,8 @@ offer_of_a_lifetime/
 | `GameManager.cs` | Singleton (duplicate-safe). Orchestrates phases, card pools, stats, popup calls, game over check. |
 | `CardData.cs` | ScriptableObject for action cards: `cardName`, `description`, `moneyCost`, `timeCostDays`, `targetRoll`, `rewardMoney`. |
 | `SetupCardData.cs` | ScriptableObject for setup cards: `category`, `cardName`, `backgroundStory`, `startingMoney`, `startingDays`, `skillName`, `isCurrentlyEmployed`. |
-| `SetupCardSlot.cs` | MonoBehaviour on each of the 4 setup card slots. `Start()` hides titleText/descriptionText GOs. `OnSlotClicked()` calls `GameManager.Instance.DrawSetupCard(this)`. `RevealCard()` shows them and fills text. |
-| `ResultPopup.cs` | Universal popup: `Show(title, body, onClose)`. Activated by GameManager after each setup card and each action card. OnCloseClicked() fires the callback. |
+| `SetupCardSlot.cs` | MonoBehaviour on each of the 4 setup card slots. Stores `_cardData` on reveal. `OnSlotClicked()`: draws card in Setup phase; shows info popup in Playing phase. `MakeMiniCard()`: hides descriptionText + gradientStrip. |
+| `ResultPopup.cs` | Universal popup: `Show(title, body, onClose=null, success=null)`. Reused for setup reveals, action results, mini card info. |
 | `GameOverPanel.cs` | Final screen: `Show(won, money, attempts, successes)`. RestartButton calls `SceneManager.LoadScene(current)`. |
 
 ## GameManager fields (serialized)
@@ -76,54 +77,74 @@ Private: `cardsRevealed`, `_attempts`, `_successes` — reset in `StartSetupPhas
 
 ## Scene hierarchy — SampleScene.unity
 
+Canvas children order (bottom z → top z):
+
 ```
-main screen  (Canvas, CanvasScaler 1920×1080, RenderMode=SSOverlay)
-  BG
-  Setup_Panel          # Setup phase only; contains Карта-1…4
-    Карта - 1          # SetupCardSlot comp=543546530, GO=543546528, RT=543546529
-      Title            # GO=2071670149, m_IsActive=0 (shown by RevealCard); TMP comp=2071670151, autoSize min=10 max=24
-                       # RT: top-anchor (0,1)→(1,1), h=50px, y=-10, x-margin 10px
-      Desc             # GO=1911901767, m_IsActive=0 (shown by RevealCard); TMP comp=1911901769, autoSize min=10 max=24
-                       # RT: stretch (0,0)→(1,1), anchoredPos (0,-30), sizeDelta (-20,-80) = 10px sides, 70px top, 10px bottom
+main screen  (Canvas RT=1461240885, CanvasScaler 1920×1080, RenderMode=SSOverlay)
+  BG                   # full-screen dark bg (#0A0E17), Image RT=0
+  Header               # GO=5100000001, RT=5100000002; top-stretch, h=70px; Image RT=0
+    TitleText          # GO=5100000011, TMP gradient title; left 60% of header
+    statsText          # GO=123879875, TMP=123879877; right half of header (anchor {0.5,0}→{1,1})
+                       # Updated by GameManager.UpdateUI() — "Деньги: X$ | Дней: Y"
+    HeaderBorder       # GO=5100000021; 1px at bottom of Header, light blue 15% opacity
+  Setup_Panel          # GO=123862486; Setup phase only; Image RT=0; m_IsActive=1 at start
+    Карта - 1          # SetupCardSlot comp=543546530, GO=543546528, RT=543546529; category=AgeAndBackground
+      Title            # GO=2071670149, m_IsActive=0 (shown by RevealCard); TMP=2071670151
+      Desc             # GO=1911901767, m_IsActive=0 (shown by RevealCard); TMP=1911901769
       CardBack         # GO=76834556; hidden by RevealCard when flipped
-    Карта - 2          # SetupCardSlot comp=182072307; Title GO=1216893317/TMP=1216893319, Desc GO=1966085269/TMP=1966085271
-    Карта - 3          # SetupCardSlot comp=46668560;  Title GO=695373560/TMP=695373562,   Desc GO=663585281/TMP=663585283
-    Карта - 4          # SetupCardSlot comp=1440729563; Title GO=1568301409/TMP=1568301411, Desc GO=408860686/TMP=408860688
-  Panel_2              # empty panel, m_IsActive=0 (unused)
-  PlayerHand           # actionPanel ref; HLG full-screen, ForceExpand=off, m_IsActive=0 at start
-    Card_Dummy         # 200×300, calls GameManager.PlayActionCard → Card_Coworking_test
-      Сходить в коворкинг
-  EventLogText_scroll  # ScrollRect, m_IsActive=1 in YAML; hidden by StartSetupPhase(), shown by StartPlayingPhase()
-    Viewport → Content → EventLogText (GO=914871998, m_IsActive=0 in YAML; TMP fileID=914871999, text="" at start)
+      GradientStrip    # GO=5300000001, RT=5300000002; 3px top of card, blue; m_IsActive=0;
+                       # shown by RevealCard, hidden by MakeMiniCard; wired in SetupCardSlot.gradientStrip
+    Карта - 2          # comp=182072307; GO=182072305/RT=182072306; GradientStrip GO=5300000011
+    Карта - 3          # comp=46668560;  GO=46668558/RT=46668559;   GradientStrip GO=5300000021
+    Карта - 4          # comp=1440729563; GO=1440729561/RT=1440729562; GradientStrip GO=5300000031
+                       # Each Карта has LayoutElement: preferredWidth=160, preferredHeight=60
+                       # LayoutElement fileIDs: 5400000001, 5400000011, 5400000021, 5400000031
+  Panel_2              # m_IsActive=0 (unused); Image RT=0
+  PlayerHand           # GO=284509795; actionPanel ref; HLG ChildControlW/H=1, ForceExpand=off
+                       # full-screen stretch anchor; Image RT=0; m_IsActive=0 at start
+    Card_Dummy         # GO=1933227224; Button→PlayActionCard(Card_Coworking_test); Image RT=1
+                       # LayoutElement comp=1933227229: preferredWidth=200, preferredHeight=300
+      Сходить в коворкинг  # child TMP label
+  PlayerBar            # GO=2200000001, RT=2200000002; HLG comp=2200000005; Image RT=0
+                       # anchor bottom, h=330px; padding L/R=20 T/B=15, spacing=15, ChildAlign=MiddleCenter
+                       # ChildControlW/H=1, ForceExpand=off; m_IsActive=0, shown by StartPlayingPhase
+                       # setup cards reparented here; LayoutElement makes them 160×60px mini cards
+  EventLogText_scroll  # GO=2146949644, RT=2146949645; ScrollRect; Image RT=0
+                       # anchor top-right, offset (-20,-90), size 380×520; m_IsActive=1 in YAML
+                       # hidden by StartSetupPhase(), shown by StartPlayingPhase()
+    Viewport           # Mask; Image RT=0
+      Content → EventLogText  # GO=914871998, m_IsActive=1; TMP=914871999
     Scrollbar Vertical
-  PlayerBar            # HLG bar at bottom h=330px, m_IsActive=0, shown on StartPlayingPhase
-                       # setup cards reparented here from Setup_Panel on phase transition
-  Деньги/Дней text     # statsText GO=123879875, TMP=123879877, m_IsActive=1, text="" (UpdateUI fills it)
-                       # RT: top-stretch (0,1)→(1,1), anchoredPos (0,-50), h=60px, pivot (0.5,1)
-                       # RENDER ORDER: after PlayerBar, before ResultPopup — renders on top of game content
-  ResultPopup          # full-screen overlay (dark 70%), m_IsActive=0, fileID=2300000001
-    PopupCard          # centered 600×420, light bg
-      TitleText        # TMP 32px bold, fileID=2300000012
-      BodyText         # TMP 22px wrap, fileID=2300000016
-      CloseButton      # blue, onClick→ResultPopup.OnCloseClicked (comp=2300000005)
-        CloseButtonText  # "ОК"
-  GameOverPanel        # full-screen overlay (dark 70%), m_IsActive=0, fileID=2400000001
-    GameOverCard       # centered 600×420, light bg
-      ResultText       # TMP 36px bold, fileID=2400000012
-      StatsText        # TMP 24px wrap, fileID=2400000016
-      RestartButton    # green, onClick→GameOverPanel.OnRestartClicked (comp=2400000005)
-        RestartButtonText  # "Сыграть ещё"
+  ResultPopup          # GO=2300000001; full-screen overlay, Image RT=1; m_IsActive=0
+    PopupCard          # centered 600×420; TitleText TMP=2300000012; BodyText TMP=2300000016
+      CloseButton      # comp=2300000018; onClick→ResultPopup.OnCloseClicked (comp=2300000005)
+  GameOverPanel        # GO=2400000001; full-screen overlay, Image RT=1; m_IsActive=0
+    GameOverCard       # centered 600×420; ResultText TMP=2400000012; StatsText TMP=2400000016
+      RestartButton    # comp=2400000018; onClick→GameOverPanel.OnRestartClicked (comp=2400000005)
 ```
+
+## RaycastTarget policy
+
+Only interactive elements have `m_RaycastTarget: 1`. Backgrounds always `0`:
+
+| RT=1 (interactive) | RT=0 (background/container) |
+|---|---|
+| Карта-1..4 Images (setup card slots) | BG, Header, Setup_Panel, Panel_2 |
+| CardBack Images | PlayerHand, PlayerBar |
+| Card_Dummy Image | EventLogText_scroll (Viewport RT=0 too) |
+| ResultPopup, PopupCard, CloseButton | GradientStrips |
+| GameOverPanel, GameOverCard, RestartButton | HeaderBorder |
+| Scrollbar Handle | |
 
 ## Key GameManager serialized references (scene fileIDs)
 
 All wired in scene YAML — no manual inspector work needed:
-- `logScrollRect` → EventLogText_scroll (fileID 2146949646)
-- `setupPanel` → Setup_Panel (fileID 123862486)
+- `logScrollRect` → EventLogText_scroll ScrollRect comp (fileID 2146949646)
+- `setupPanel` → Setup_Panel GO (fileID 123862486)
 - `actionPanel` → PlayerHand GO (fileID 284509795)
-- `statsText` → TMP comp fileID 123879877 (GO 123879875, "Text (TMP)")
+- `statsText` → TMP comp fileID 123879877 (inside Header GO)
 - `eventLogText` → TMP comp fileID 914871999 (GO 914871998, "EventLogText")
-- `playerBarPanel` → PlayerBar (fileID 2200000002)
+- `playerBarPanel` → PlayerBar RT (fileID 2200000002)
 - `setupCardSlots` → comps [543546530, 182072307, 46668560, 1440729563]
 - `resultPopup` → ResultPopup script comp (fileID 2300000005)
 - `gameOverPanel` → GameOverPanel script comp (fileID 2400000005)
@@ -141,19 +162,20 @@ All wired in scene YAML — no manual inspector work needed:
 | Image | fe87c0e1cc204ed48ad3b37840f39efc |
 | Button | 4e29b1a8efbd4b44bb3f3716e73f07ff |
 | HorizontalLayoutGroup | 30649d3a9faa99c48a7b1166b86bf2a0 |
+| LayoutElement | 306cc8c2b49d7114eaa3623786fc2126 |
 | TMP font asset | 8f586378b4e144a9851e7b34d9b748ee |
 
 ## UI layout decisions
 
-- **Event log** hidden during Setup phase (logScrollRect.SetActive false in StartSetupPhase), shown on Playing start
-- **Setup cards** reparented from Setup_Panel → PlayerBar when Playing starts
-- **Action cards** (PlayerHand) anchored full-screen, cards keep intrinsic 200×300 size
-- **PlayerBar** anchored bottom, height 330px, dark semi-transparent bg
-- **statsText** renders AFTER PlayerBar in canvas order — ensures it draws on top of PlayerHand during Playing phase
-- **Setup card Title/Desc text** hidden in YAML (m_IsActive=0); shown at runtime by SetupCardSlot.RevealCard()
-- **Popups** are full-screen overlays (RaycastTarget=true) — block all clicks behind them
-- **ResultPopup** is reused for both setup card reveals and action card results
-- **Dice roll** is automatic inside PlayActionCard() — no separate button exists
+- **Header** is a 70px bar at top; contains TitleText (left) and statsText (right); HeaderBorder at its bottom edge
+- **statsText** lives INSIDE Header RT — not a direct Canvas child
+- **Event log** positioned top-right (380×520); hidden in Setup, shown in Playing
+- **Setup cards** reparented from Setup_Panel → PlayerBar on phase transition; LayoutElement gives them 160×60px mini size
+- **GradientStrips** shown on card reveal (RevealCard), hidden on mini card transition (MakeMiniCard) to avoid visual stripe artifact
+- **Action cards** (PlayerHand) full-screen HLG container; Card_Dummy has explicit LayoutElement so HLG sizes it correctly
+- **PlayerBar** anchored bottom, h=330px, dark semi-transparent bg; HLG centers mini cards (MiddleCenter)
+- **Popups** are full-screen overlays (RT=true) — block all clicks behind them; ResultPopup reused for setup reveals, action results, and mini card info
+- **Dice roll** is automatic inside PlayActionCard() — no separate button
 
 ## Scene editing approach
 
@@ -161,7 +183,8 @@ Scene is in Git LFS — diffs show only the LFS hash. All UI changes done by edi
 - New GO: append YAML blocks + add RT fileID to parent's `m_Children`
 - New script ref in scene: add to GameManager MonoBehaviour block (fileID 958324828)
 - New script: also create `.meta` with matching GUID
-- FileID ranges used: PlayerBar=2200000xxx, ResultPopup=2300000xxx, GameOverPanel=2400000xxx
+- When replacing strings in YAML, use `--- !u!224 &{rt_fileid}` as unique block anchor (not m_Children patterns which can repeat)
+- FileID ranges used: Header=5100000xxx, ResultPopup=2300000xxx, GameOverPanel=2400000xxx, PlayerBar=2200000xxx, GradientStrips=5300000xxx, LayoutElements=5400000xxx
 
 ## Conventions
 
