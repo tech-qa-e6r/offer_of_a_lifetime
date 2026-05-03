@@ -167,9 +167,8 @@ public class GameManager : MonoBehaviour
             string body = $"{cardToPlay.cardName}\n\nБросок: {roll}  (нужно {cardToPlay.targetRoll})\n\n";
             body += success ? $"+{cardToPlay.rewardMoney}$" : "Ресурсы потрачены зря.";
 
-            LogEvent(success
-                ? $"Успех! {cardToPlay.cardName}. Бросок: {roll}. +{cardToPlay.rewardMoney}$"
-                : $"Провал! {cardToPlay.cardName}. Бросок: {roll}.");
+            string icon = success ? "✓" : "✗";
+            LogEvent($"{icon} {cardToPlay.cardName}: d{roll} → {(success ? $"+{cardToPlay.rewardMoney}$" : "провал")}");
 
             resultPopup.Show(title, body, onClose: CheckGameOver, success: success);
         }
@@ -189,7 +188,7 @@ public class GameManager : MonoBehaviour
 
     private void LogEvent(string message)
     {
-        eventLogText.text += $"- {message}\n\n";
+        eventLogText.text += $"{message}\n\n";
         Canvas.ForceUpdateCanvases();
         if (logScrollRect != null)
             logScrollRect.verticalNormalizedPosition = 0f;
