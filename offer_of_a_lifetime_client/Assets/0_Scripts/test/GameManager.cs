@@ -20,6 +20,8 @@ public class GameManager : MonoBehaviour
     [Header("UI Панели")]
     public GameObject setupPanel;  // Панель подготовки (4 карты)
     public GameObject actionPanel; // Панель действий (коворкинг и тд)
+    public RectTransform playerBarPanel; // Бар с картами игрока (всегда виден в Playing)
+    public List<SetupCardSlot> setupCardSlots; // 4 слота карт предыстории
 
     [Header("UI Элементы игры")]
     public TextMeshProUGUI statsText;
@@ -116,6 +118,14 @@ public class GameManager : MonoBehaviour
         setupPanel.SetActive(false);
         actionPanel.SetActive(true);
         logScrollRect.gameObject.SetActive(true);
+
+        if (playerBarPanel != null)
+        {
+            foreach (var slot in setupCardSlots)
+                slot.transform.SetParent(playerBarPanel, false);
+            playerBarPanel.gameObject.SetActive(true);
+        }
+
         LogEvent("Вы в игре. Выберите действие.");
     }
 
