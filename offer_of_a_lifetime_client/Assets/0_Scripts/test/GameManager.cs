@@ -132,7 +132,10 @@ public class GameManager : MonoBehaviour
         if (playerBarPanel != null)
         {
             foreach (var slot in setupCardSlots)
+            {
                 slot.transform.SetParent(playerBarPanel, false);
+                slot.MakeMiniCard();
+            }
             playerBarPanel.gameObject.SetActive(true);
         }
 

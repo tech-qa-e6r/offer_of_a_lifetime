@@ -8,9 +8,10 @@ public class SetupCardSlot : MonoBehaviour
     public SetupCategory category; // Какую категорию тянет этот слот
 
     [Header("UI Элементы")]
-    public GameObject cardBack; // Объект "Рубашка" карты
-    public TextMeshProUGUI titleText; // Текст названия
-    public TextMeshProUGUI descriptionText; // Текст истории
+    public GameObject cardBack;
+    public TextMeshProUGUI titleText;
+    public TextMeshProUGUI descriptionText;
+    public GameObject gradientStrip;
 
     private bool isRevealed = false;
 
@@ -33,6 +34,12 @@ public class SetupCardSlot : MonoBehaviour
         titleText.text = data.cardName;
         descriptionText.text = data.backgroundStory;
         cardBack.SetActive(false);
+        if (gradientStrip != null) gradientStrip.SetActive(true);
         isRevealed = true;
+    }
+
+    public void MakeMiniCard()
+    {
+        if (descriptionText != null) descriptionText.gameObject.SetActive(false);
     }
 }
