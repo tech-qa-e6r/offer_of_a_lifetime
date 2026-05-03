@@ -12,3 +12,12 @@ __pycache__/
 .vscode/
 
 builds/
+
+# Unity folders belong only inside offer_of_a_lifetime_client/ — ignore if accidentally at repo root
+/Assets/
+/Library/
+/Packages/
+/ProjectSettings/
+/UserSettings/
+/Temp/
+/Logs/
