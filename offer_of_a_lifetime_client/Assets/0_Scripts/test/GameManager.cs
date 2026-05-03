@@ -168,7 +168,7 @@ public class GameManager : MonoBehaviour
                 ? $"Успех! {cardToPlay.cardName}. Бросок: {roll}. +{cardToPlay.rewardMoney}$"
                 : $"Провал! {cardToPlay.cardName}. Бросок: {roll}.");
 
-            resultPopup.Show(title, body, onClose: CheckGameOver);
+            resultPopup.Show(title, body, onClose: CheckGameOver, success: success);
         }
         else
         {
