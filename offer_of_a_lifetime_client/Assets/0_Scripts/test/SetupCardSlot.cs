@@ -5,7 +5,7 @@ using TMPro;
 public class SetupCardSlot : MonoBehaviour
 {
     [Header("Настройки слота")]
-    public SetupCategory category; // Какую категорию тянет этот слот
+    public SetupCategory category;
 
     [Header("UI Элементы")]
     public GameObject cardBack;
@@ -14,6 +14,7 @@ public class SetupCardSlot : MonoBehaviour
     public GameObject gradientStrip;
 
     private bool isRevealed = false;
+    private SetupCardData _cardData;
 
     void Start()
     {
@@ -23,12 +24,27 @@ public class SetupCardSlot : MonoBehaviour
 
     public void OnSlotClicked()
     {
-        if (isRevealed) return;
-        GameManager.Instance.DrawSetupCard(this);
+        if (!isRevealed)
+        {
+            GameManager.Instance.DrawSetupCard(this);
+            return;
+        }
+        if (_cardData != null && GameManager.Instance.currentState == GameManager.GameState.Playing)
+        {
+            string body = _cardData.backgroundStory;
+            if (_cardData.category == SetupCategory.StartingResources)
+                body += $"\n\n+{_cardData.startingMoney}$  |  +{_cardData.startingDays} дней";
+            else if (_cardData.category == SetupCategory.BasicSkill)
+                body += $"\n\nНавык: {_cardData.skillName}";
+            else if (_cardData.category == SetupCategory.EmploymentStatus)
+                body += $"\n\n{(_cardData.isCurrentlyEmployed ? "Есть работа" : "Безработный")}";
+            GameManager.Instance.resultPopup.Show(_cardData.cardName, body);
+        }
     }
 
     public void RevealCard(SetupCardData data)
     {
+        _cardData = data;
         titleText.gameObject.SetActive(true);
         descriptionText.gameObject.SetActive(true);
         titleText.text = data.cardName;
@@ -41,5 +57,6 @@ public class SetupCardSlot : MonoBehaviour
     public void MakeMiniCard()
     {
         if (descriptionText != null) descriptionText.gameObject.SetActive(false);
+        if (gradientStrip != null) gradientStrip.SetActive(false);
     }
 }
