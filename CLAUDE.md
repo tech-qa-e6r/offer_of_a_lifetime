@@ -47,12 +47,13 @@ offer_of_a_lifetime/
 
 | File | Role |
 |------|------|
-| `GameManager.cs` | Singleton (duplicate-safe). Orchestrates phases, card pools, stats, popup calls, game over check. |
+| `GameManager.cs` | Singleton (duplicate-safe). Orchestrates phases, card pools, stats, popup calls, game over check. Log uses ASCII only: `[OK]`/`[X]`, `->`. |
 | `CardData.cs` | ScriptableObject for action cards: `cardName`, `description`, `moneyCost`, `timeCostDays`, `targetRoll`, `rewardMoney`. |
 | `SetupCardData.cs` | ScriptableObject for setup cards: `category`, `cardName`, `backgroundStory`, `startingMoney`, `startingDays`, `skillName`, `isCurrentlyEmployed`. |
 | `SetupCardSlot.cs` | MonoBehaviour on each of the 4 setup card slots. Stores `_cardData` on reveal. `OnSlotClicked()`: draws card in Setup phase; shows info popup in Playing phase. `MakeMiniCard()`: hides descriptionText + gradientStrip. |
 | `ResultPopup.cs` | Universal popup: `Show(title, body, onClose=null, success=null)`. Reused for setup reveals, action results, mini card info. |
-| `GameOverPanel.cs` | Final screen: `Show(won, money, attempts, successes)`. RestartButton calls `SceneManager.LoadScene(current)`. |
+| `GameOverPanel.cs` | Final screen: `Show(won, money, attempts, successes)`. ResultText is plain ASCII (no emoji). RestartButton calls `SceneManager.LoadScene(current)`. |
+| `CardHoverEffect.cs` | IPointerEnterHandler/IPointerExitHandler. Shows blue border (`#638cff`, alpha 0→1) on hover via `borderImage` (CardBorder Image child of the card). GUID: `a1b2c3d4e5f60001a1b2c3d4e5f60001`. |
 
 ## GameManager fields (serialized)
 
@@ -104,9 +105,13 @@ main screen  (Canvas RT=1461240885, CanvasScaler 1920×1080, RenderMode=SSOverla
                        # full-screen stretch anchor; Image RT=0; m_IsActive=0 at start
     Card_Dummy         # GO=1933227224; Button→PlayActionCard(Card_Coworking_test); Image RT=1
                        # LayoutElement comp=1933227229: preferredWidth=200, preferredHeight=300
-      Сходить в коворкинг  # child TMP label
+                       # CardHoverEffect comp=1933227238 (borderImage→1933227233)
+      AccentStrip      # GO=1933227234, RT=1933227235; 3px top strip, color #638cff; RT=0
+      CardBorder       # GO=1933227230, RT=1933227231; stretch+4px, Sliced FillCenter=0
+                       # Image=1933227233; color alpha=0 idle, alpha=1 on hover; RT=0
+      Сходить в коворкинг  # child TMP label (renders on top)
   PlayerBar            # GO=2200000001, RT=2200000002; HLG comp=2200000005; Image RT=0
-                       # anchor bottom, h=330px; padding L/R=20 T/B=15, spacing=15, ChildAlign=MiddleCenter
+                       # anchor bottom, h=90px; padding L/R=20 T/B=12, spacing=15, ChildAlign=MiddleCenter
                        # ChildControlW/H=1, ForceExpand=off; m_IsActive=0, shown by StartPlayingPhase
                        # setup cards reparented here; LayoutElement makes them 160×60px mini cards
   EventLogText_scroll  # GO=2146949644, RT=2146949645; ScrollRect; Image RT=0
@@ -156,6 +161,7 @@ All wired in scene YAML — no manual inspector work needed:
 |--------|------|
 | GameManager | ade62bd9dfcfe4da395af22723cb0c09 |
 | SetupCardSlot | 3b7a97125903e4ef8b5292c4cfd0804e |
+| CardHoverEffect | a1b2c3d4e5f60001a1b2c3d4e5f60001 |
 | ResultPopup | c1b2a3f4e5d60001c1b2a3f4e5d60001 |
 | GameOverPanel | c1b2a3f4e5d60002c1b2a3f4e5d60002 |
 | TMP (TextMeshProUGUI) | f4688fdb7df04437aeb418b961361dc5 |
@@ -176,6 +182,9 @@ All wired in scene YAML — no manual inspector work needed:
 - **PlayerBar** anchored bottom, h=330px, dark semi-transparent bg; HLG centers mini cards (MiddleCenter)
 - **Popups** are full-screen overlays (RT=true) — block all clicks behind them; ResultPopup reused for setup reveals, action results, and mini card info
 - **Dice roll** is automatic inside PlayActionCard() — no separate button
+- **Font limitation** — LiberationSans SDF does NOT support emoji or special Unicode (✓ ✗ → 🎲 etc). All game strings must use ASCII: `[OK]`, `[X]`, `->`. Russian Cyrillic is supported via TMP fallback.
+- **CardHoverEffect** — border is a child Image (CardBorder) with Sliced type and FillCenter=0, alpha 0 idle → 1 on hover. AccentStrip is a 3px top-anchor Image always visible (#638cff).
+- **FileID ranges for Card_Dummy additions** — AccentStrip: 1933227234–1933227237, CardBorder: 1933227230–1933227233, CardHoverEffect comp: 1933227238
 
 ## Scene editing approach
 
