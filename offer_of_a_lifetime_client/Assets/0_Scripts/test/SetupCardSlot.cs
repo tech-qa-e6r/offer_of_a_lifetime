@@ -14,22 +14,24 @@ public class SetupCardSlot : MonoBehaviour
 
     private bool isRevealed = false;
 
+    void Start()
+    {
+        titleText.gameObject.SetActive(false);
+        descriptionText.gameObject.SetActive(false);
+    }
+
     public void OnSlotClicked()
     {
-        // Если карта уже открыта - ничего не делаем
-        if (isRevealed) return; 
-
-        // Запрашиваем у менеджера случайную карту этой категории
+        if (isRevealed) return;
         GameManager.Instance.DrawSetupCard(this);
     }
 
     public void RevealCard(SetupCardData data)
     {
-        // Заполняем UI
+        titleText.gameObject.SetActive(true);
+        descriptionText.gameObject.SetActive(true);
         titleText.text = data.cardName;
         descriptionText.text = data.backgroundStory;
-        
-        // Прячем рубашку
         cardBack.SetActive(false);
         isRevealed = true;
     }

@@ -84,10 +84,9 @@ main screen  (Canvas, CanvasScaler 1920×1080)
     Карта - 2          # SetupCardSlot, category=BasicSkill,          comp=182072307
     Карта - 3          # SetupCardSlot, category=StartingResources,   comp=46668560
     Карта - 4          # SetupCardSlot, category=EmploymentStatus,    comp=1440729563
-  Panel_2              # actionPanel ref, Playing phase bg
-  Бросить D20          # d20 button
-  Деньги/Дней text     # statsText (TMP), fileID=123879877
-  PlayerHand           # HLG full-screen, ForceExpand=off
+  Panel_2              # actionPanel ref, Playing phase bg (inactive at start)
+  Деньги/Дней text     # statsText (TMP), fileID=123879877 — direct canvas child, anchored top-strip (0,1)→(1,1) h=60px
+  PlayerHand           # HLG full-screen, ForceExpand=off (inactive at start)
     Card_Dummy         # 200×300, calls GameManager.PlayActionCard → Card_Coworking_test
       Сходить в коворкинг
   EventLogText_scroll  # ScrollRect, hidden during Setup
@@ -114,7 +113,7 @@ main screen  (Canvas, CanvasScaler 1920×1080)
 All wired in scene YAML — no manual inspector work needed:
 - `logScrollRect` → EventLogText_scroll (fileID 2146949646)
 - `setupPanel` → Setup_Panel (fileID 123862486)
-- `actionPanel` → Panel_2 (fileID 1108952729)
+- `actionPanel` → PlayerHand (fileID 284509795) — was wrongly pointing to Panel_2; fixed
 - `statsText` → fileID 123879877
 - `eventLogText` → fileID 914871999
 - `playerBarPanel` → PlayerBar (fileID 2200000002)
