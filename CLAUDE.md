@@ -47,13 +47,16 @@ offer_of_a_lifetime/
 
 | File | Role |
 |------|------|
-| `GameManager.cs` | Singleton (duplicate-safe). Orchestrates phases, card pools, stats, popup calls, game over check. Log uses ASCII only: `[OK]`/`[X]`, `->`. |
+| `GameManager.cs` | Singleton (duplicate-safe). Orchestrates phases, card pools, stats, popup calls, game over check. Log uses ASCII only: `[OK]`/`[X]`, `->`. `UpdateUI()` uses TMP rich text: `<color=#638cff>$</color>X   <color=#638cff>d.</color>Y`. |
 | `CardData.cs` | ScriptableObject for action cards: `cardName`, `description`, `moneyCost`, `timeCostDays`, `targetRoll`, `rewardMoney`. |
 | `SetupCardData.cs` | ScriptableObject for setup cards: `category`, `cardName`, `backgroundStory`, `startingMoney`, `startingDays`, `skillName`, `isCurrentlyEmployed`. |
 | `SetupCardSlot.cs` | MonoBehaviour on each of the 4 setup card slots. Stores `_cardData` on reveal. `OnSlotClicked()`: draws card in Setup phase; shows info popup in Playing phase. `MakeMiniCard()`: hides descriptionText + gradientStrip. |
 | `ResultPopup.cs` | Universal popup: `Show(title, body, onClose=null, success=null)`. Reused for setup reveals, action results, mini card info. |
 | `GameOverPanel.cs` | Final screen: `Show(won, money, attempts, successes)`. ResultText is plain ASCII (no emoji). RestartButton calls `SceneManager.LoadScene(current)`. |
-| `CardHoverEffect.cs` | IPointerEnterHandler/IPointerExitHandler. Shows blue border (`#638cff`, alpha 0→1) on hover via `borderImage` (CardBorder Image child of the card). GUID: `a1b2c3d4e5f60001a1b2c3d4e5f60001`. |
+| `CardHoverEffect.cs` | Uses programmatic EventTrigger (NOT IPointerEnterHandler — Button on same GO blocks it in Unity 6). Shows blue border (`#638cff`, alpha 0→1) on hover. `borderImage` = CardBorder Image child. GUID: `a1b2c3d4e5f60001a1b2c3d4e5f60001`. |
+| `BackgroundGrid.cs` | Attached to BackgroundGrid GO. Creates 48px grid RawImage with `rgba(99,140,255,10)` lines at runtime; uvRect tiles over 1920×1080. RT=false. GUID: `b1c2d3e4f5a60001b1c2d3e4f5a60001`. |
+| `GradientFade.cs` | Attached to PlayerBarFade GO. Creates 1×32 gradient RawImage (opaque BG color at bottom → transparent at top) at runtime. Positioned at y=90, h=60 (above PlayerBar). RT=false. GUID: `b1c2d3e4f5a60003b1c2d3e4f5a60003`. |
+| `ActionCardDisplay.cs` | Attached to Card_Dummy GO. Serializes `cardData` (CardData asset) + TMP refs (`titleText`, `descriptionText`, `costText`). In Start(), fills card label text from asset data. GUID: `b1c2d3e4f5a60002b1c2d3e4f5a60002`. |
 
 ## GameManager fields (serialized)
 
@@ -83,10 +86,11 @@ Canvas children order (bottom z → top z):
 ```
 main screen  (Canvas RT=1461240885, CanvasScaler 1920×1080, RenderMode=SSOverlay)
   BG                   # full-screen dark bg (#0A0E17), Image RT=0
+  BackgroundGrid       # GO=6100000001, RT=6100000002; full-stretch; BackgroundGrid.cs creates 48px grid at runtime
   Header               # GO=5100000001, RT=5100000002; top-stretch, h=70px; Image RT=0
-    TitleText          # GO=5100000011, TMP gradient title; left 60% of header
+    TitleText          # GO=5100000011, TMP gradient title (#638cff→#ffd66b); left 60% of header
     statsText          # GO=123879875, TMP=123879877; right half of header (anchor {0.5,0}→{1,1})
-                       # Updated by GameManager.UpdateUI() — "Деньги: X$ | Дней: Y"
+                       # UpdateUI() rich text: "<color=#638cff>$</color>X   <color=#638cff>d.</color>Y"
     HeaderBorder       # GO=5100000021; 1px at bottom of Header, light blue 15% opacity
   Setup_Panel          # GO=123862486; Setup phase only; Image RT=0; m_IsActive=1 at start
     Карта - 1          # SetupCardSlot comp=543546530, GO=543546528, RT=543546529; category=AgeAndBackground
@@ -95,9 +99,10 @@ main screen  (Canvas RT=1461240885, CanvasScaler 1920×1080, RenderMode=SSOverla
       CardBack         # GO=76834556; hidden by RevealCard when flipped
       GradientStrip    # GO=5300000001, RT=5300000002; 3px top of card, blue; m_IsActive=0;
                        # shown by RevealCard, hidden by MakeMiniCard; wired in SetupCardSlot.gradientStrip
-    Карта - 2          # comp=182072307; GO=182072305/RT=182072306; GradientStrip GO=5300000011
-    Карта - 3          # comp=46668560;  GO=46668558/RT=46668559;   GradientStrip GO=5300000021
-    Карта - 4          # comp=1440729563; GO=1440729561/RT=1440729562; GradientStrip GO=5300000031
+      PillBorder       # GO=6200000001, RT=6200000002; full-stretch Sliced FillCenter=0, #638cff alpha=0.3; RT=0
+    Карта - 2          # comp=182072307; GO=182072305/RT=182072306; GradientStrip GO=5300000011; PillBorder GO=6200000011
+    Карта - 3          # comp=46668560;  GO=46668558/RT=46668559;   GradientStrip GO=5300000021; PillBorder GO=6200000021
+    Карта - 4          # comp=1440729563; GO=1440729561/RT=1440729562; GradientStrip GO=5300000031; PillBorder GO=6200000031
                        # Each Карта has LayoutElement: preferredWidth=160, preferredHeight=60
                        # LayoutElement fileIDs: 5400000001, 5400000011, 5400000021, 5400000031
   Panel_2              # m_IsActive=0 (unused); Image RT=0
@@ -106,14 +111,23 @@ main screen  (Canvas RT=1461240885, CanvasScaler 1920×1080, RenderMode=SSOverla
     Card_Dummy         # GO=1933227224; Button→PlayActionCard(Card_Coworking_test); Image RT=1
                        # LayoutElement comp=1933227229: preferredWidth=200, preferredHeight=300
                        # CardHoverEffect comp=1933227238 (borderImage→1933227233)
+                       # ActionCardDisplay comp=6400000021; wired to Card_Coworking_test + title/desc/cost TMPs
       AccentStrip      # GO=1933227234, RT=1933227235; 3px top strip, color #638cff; RT=0
       CardBorder       # GO=1933227230, RT=1933227231; stretch+4px, Sliced FillCenter=0
                        # Image=1933227233; color alpha=0 idle, alpha=1 on hover; RT=0
-      Сходить в коворкинг  # child TMP label (renders on top)
+      CardTitle        # GO=50197198 (was "Сходить в коворкинг"), RT=50197199, TMP=50197200
+                       # top-anchored (0,1)→(1,1), h=50, y=-30; fontSize=20, bold; filled by ActionCardDisplay
+      CardDesc         # GO=6400000001, RT=6400000002, TMP=6400000003
+                       # anchor (0,0.28)→(1,0.72), middle section; fontSize=13, gray; filled by ActionCardDisplay
+      CardCost         # GO=6400000011, RT=6400000012, TMP=6400000013
+                       # anchor bottom (0,0)→(1,0), h=32, y=18; fontSize=14, #638cff; filled by ActionCardDisplay
   PlayerBar            # GO=2200000001, RT=2200000002; HLG comp=2200000005; Image RT=0
                        # anchor bottom, h=90px; padding L/R=20 T/B=12, spacing=15, ChildAlign=MiddleCenter
                        # ChildControlW/H=1, ForceExpand=off; m_IsActive=0, shown by StartPlayingPhase
                        # setup cards reparented here; LayoutElement makes them 160×60px mini cards
+                       # each Карта now also has PillBorder child (#638cff alpha=0.3 border)
+  PlayerBarFade        # GO=6300000001, RT=6300000002; anchor bottom y=90 h=60; GradientFade.cs
+                       # opaque BG color at bottom → transparent; visually softens PlayerBar top edge
   EventLogText_scroll  # GO=2146949644, RT=2146949645; ScrollRect; Image RT=0
                        # anchor top-right, offset (-20,-90), size 380×520; m_IsActive=1 in YAML
                        # hidden by StartSetupPhase(), shown by StartPlayingPhase()
@@ -162,6 +176,9 @@ All wired in scene YAML — no manual inspector work needed:
 | GameManager | ade62bd9dfcfe4da395af22723cb0c09 |
 | SetupCardSlot | 3b7a97125903e4ef8b5292c4cfd0804e |
 | CardHoverEffect | a1b2c3d4e5f60001a1b2c3d4e5f60001 |
+| BackgroundGrid | b1c2d3e4f5a60001b1c2d3e4f5a60001 |
+| ActionCardDisplay | b1c2d3e4f5a60002b1c2d3e4f5a60002 |
+| GradientFade | b1c2d3e4f5a60003b1c2d3e4f5a60003 |
 | ResultPopup | c1b2a3f4e5d60001c1b2a3f4e5d60001 |
 | GameOverPanel | c1b2a3f4e5d60002c1b2a3f4e5d60002 |
 | TMP (TextMeshProUGUI) | f4688fdb7df04437aeb418b961361dc5 |
@@ -179,12 +196,16 @@ All wired in scene YAML — no manual inspector work needed:
 - **Setup cards** reparented from Setup_Panel → PlayerBar on phase transition; LayoutElement gives them 160×60px mini size
 - **GradientStrips** shown on card reveal (RevealCard), hidden on mini card transition (MakeMiniCard) to avoid visual stripe artifact
 - **Action cards** (PlayerHand) full-screen HLG container; Card_Dummy has explicit LayoutElement so HLG sizes it correctly
-- **PlayerBar** anchored bottom, h=330px, dark semi-transparent bg; HLG centers mini cards (MiddleCenter)
+- **PlayerBar** anchored bottom, h=90px, dark semi-transparent bg; HLG centers mini cards (MiddleCenter)
+- **PlayerBarFade** — canvas child immediately above PlayerBar; GradientFade.cs creates gradient RawImage at runtime fading from BG color (bottom) to transparent (top); softens the PlayerBar's top edge
 - **Popups** are full-screen overlays (RT=true) — block all clicks behind them; ResultPopup reused for setup reveals, action results, and mini card info
 - **Dice roll** is automatic inside PlayActionCard() — no separate button
 - **Font limitation** — LiberationSans SDF does NOT support emoji or special Unicode (✓ ✗ → 🎲 etc). All game strings must use ASCII: `[OK]`, `[X]`, `->`. Russian Cyrillic is supported via TMP fallback.
-- **CardHoverEffect** — border is a child Image (CardBorder) with Sliced type and FillCenter=0, alpha 0 idle → 1 on hover. AccentStrip is a 3px top-anchor Image always visible (#638cff).
-- **FileID ranges for Card_Dummy additions** — AccentStrip: 1933227234–1933227237, CardBorder: 1933227230–1933227233, CardHoverEffect comp: 1933227238
+- **CardHoverEffect** — uses programmatic EventTrigger (NOT IPointerEnterHandler — Button on same GO blocks it in Unity 6). Shows blue border (`#638cff`, alpha 0→1) on hover. `borderImage` = CardBorder Image child. AccentStrip is a 3px top-anchor Image always visible (#638cff).
+- **ActionCardDisplay** — fills CardTitle/CardDesc/CardCost TMPs from CardData asset in Start(). costText format: `"{moneyCost}$  /  {timeCostDays}d."`.
+- **BackgroundGrid** — canvas child between BG and Header; creates tiled 48px grid at runtime via RawImage with uvRect (40×22.5 tiles).
+- **PillBorders on setup cards** — each Карта-1..4 has a PillBorder child (Sliced FillCenter=0, #638cff alpha=0.3). Visible in both Setup and PlayerBar mini-card states.
+- **FileID ranges** — Header=5100000xxx, ResultPopup=2300000xxx, GameOverPanel=2400000xxx, PlayerBar=2200000xxx, GradientStrips=5300000xxx, LayoutElements=5400000xxx, BackgroundGrid=6100000xxx, PillBorders=6200000xxx, PlayerBarFade=6300000xxx, CardDesc/Cost/ActionCardDisplay=6400000xxx
 
 ## Scene editing approach
 
@@ -193,7 +214,7 @@ Scene is in Git LFS — diffs show only the LFS hash. All UI changes done by edi
 - New script ref in scene: add to GameManager MonoBehaviour block (fileID 958324828)
 - New script: also create `.meta` with matching GUID
 - When replacing strings in YAML, use `--- !u!224 &{rt_fileid}` as unique block anchor (not m_Children patterns which can repeat)
-- FileID ranges used: Header=5100000xxx, ResultPopup=2300000xxx, GameOverPanel=2400000xxx, PlayerBar=2200000xxx, GradientStrips=5300000xxx, LayoutElements=5400000xxx
+- FileID ranges used: Header=5100000xxx, ResultPopup=2300000xxx, GameOverPanel=2400000xxx, PlayerBar=2200000xxx, GradientStrips=5300000xxx, LayoutElements=5400000xxx, BackgroundGrid=6100000xxx, PillBorders=6200000xxx, PlayerBarFade=6300000xxx, CardDesc/Cost/ActionCardDisplay=6400000xxx
 
 ## Conventions
 

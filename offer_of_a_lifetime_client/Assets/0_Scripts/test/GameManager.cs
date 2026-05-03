@@ -197,6 +197,6 @@ public class GameManager : MonoBehaviour
     private void UpdateUI()
     {
         if (statsText != null)
-            statsText.text = $"Деньги: {currentMoney}$ | Дней: {currentDays}";
+            statsText.text = $"<color=#638cff>$</color>{currentMoney}   <color=#638cff>d.</color>{currentDays}";
     }
 }
