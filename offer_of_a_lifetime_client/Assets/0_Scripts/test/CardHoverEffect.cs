@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 
-public class CardHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
+public class CardHoverEffect : MonoBehaviour
 {
     public Image borderImage;
 
@@ -12,14 +12,24 @@ public class CardHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointerExit
     void Start()
     {
         if (borderImage != null) borderImage.color = s_idleColor;
+
+        var trigger = gameObject.GetComponent<EventTrigger>() ?? gameObject.AddComponent<EventTrigger>();
+
+        var enter = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
+        enter.callback.AddListener(_ => ShowBorder());
+        trigger.triggers.Add(enter);
+
+        var exit = new EventTrigger.Entry { eventID = EventTriggerType.PointerExit };
+        exit.callback.AddListener(_ => HideBorder());
+        trigger.triggers.Add(exit);
     }
 
-    public void OnPointerEnter(PointerEventData eventData)
+    private void ShowBorder()
     {
         if (borderImage != null) borderImage.color = s_hoverColor;
     }
 
-    public void OnPointerExit(PointerEventData eventData)
+    private void HideBorder()
     {
         if (borderImage != null) borderImage.color = s_idleColor;
     }
