@@ -6,7 +6,7 @@ using TMPro;
 public class GameManager : MonoBehaviour
 {
     public ScrollRect logScrollRect;
-    public static GameManager Instance; // Синглтон для быстрого доступа
+    public static GameManager Instance;
 
     public enum GameState { Setup, Playing }
     public GameState currentState;
@@ -18,20 +18,29 @@ public class GameManager : MonoBehaviour
     public List<SetupCardData> jobCards;
 
     [Header("UI Панели")]
-    public GameObject setupPanel;  // Панель подготовки (4 карты)
-    public GameObject actionPanel; // Панель действий (коворкинг и тд)
-    public RectTransform playerBarPanel; // Бар с картами игрока (всегда виден в Playing)
-    public List<SetupCardSlot> setupCardSlots; // 4 слота карт предыстории
+    public GameObject setupPanel;
+    public GameObject actionPanel;
+    public RectTransform playerBarPanel;
+    public List<SetupCardSlot> setupCardSlots;
 
     [Header("UI Элементы игры")]
     public TextMeshProUGUI statsText;
-    public TextMeshProUGUI eventLogText; // Боковое окно логов
+    public TextMeshProUGUI eventLogText;
+
+    [Header("Попапы")]
+    public ResultPopup resultPopup;
+    public GameOverPanel gameOverPanel;
 
     [Header("Текущие статы игрока")]
     public int currentMoney = 0;
     public int currentDays = 0;
-    
+
+    [Header("Условие победы")]
+    public int targetMoney = 1000;
+
     private int cardsRevealed = 0;
+    private int _attempts = 0;
+    private int _successes = 0;
 
     void Awake()
     {
@@ -52,22 +61,18 @@ public class GameManager : MonoBehaviour
         setupPanel.SetActive(true);
         actionPanel.SetActive(false);
         logScrollRect.gameObject.SetActive(false);
-
         eventLogText.text = "";
+        cardsRevealed = 0;
+        _attempts = 0;
+        _successes = 0;
     }
 
-    // Вызывается слотом при клике по рубашке
     public void DrawSetupCard(SetupCardSlot slot)
     {
         if (currentState != GameState.Setup) return;
 
-        // Имитация броска d20 для лога
-        int roll = Random.Range(1, 21);
-        
         SetupCardData drawnCard = null;
 
-        // Выбираем случайную карту из нужного пула
-        // Random.Range(0, Count) берет случайный индекс из списка
         switch (slot.category)
         {
             case SetupCategory.AgeAndBackground:
@@ -86,17 +91,20 @@ public class GameManager : MonoBehaviour
 
         if (drawnCard != null)
         {
-            LogEvent($"Бросок d20: {roll}. Выпало: {drawnCard.cardName}");
             slot.RevealCard(drawnCard);
             ApplySetupCardStats(drawnCard);
-            
             cardsRevealed++;
-            if (cardsRevealed >= 4)
-            {
-                LogEvent("Все карты открыты. Переходим к игре!");
-                // Здесь можно добавить кнопку "Начать", но пока переключаем автоматически
-                Invoke(nameof(StartPlayingPhase), 2f);
-            }
+
+            string body = drawnCard.backgroundStory;
+            if (drawnCard.category == SetupCategory.StartingResources)
+                body += $"\n\n+{drawnCard.startingMoney}$  |  +{drawnCard.startingDays} дней";
+            else if (drawnCard.category == SetupCategory.BasicSkill)
+                body += $"\n\nНавык: {drawnCard.skillName}";
+            else if (drawnCard.category == SetupCategory.EmploymentStatus)
+                body += $"\n\n{(drawnCard.isCurrentlyEmployed ? "Есть работа" : "Безработный")}";
+
+            System.Action onClose = cardsRevealed >= 4 ? (System.Action)StartPlayingPhase : null;
+            resultPopup.Show(drawnCard.cardName, body, onClose);
         }
         else
         {
@@ -106,7 +114,6 @@ public class GameManager : MonoBehaviour
 
     private void ApplySetupCardStats(SetupCardData data)
     {
-        // Добавляем статы только если это карта ресурсов
         if (data.category == SetupCategory.StartingResources)
         {
             currentMoney += data.startingMoney;
@@ -132,7 +139,6 @@ public class GameManager : MonoBehaviour
         LogEvent("Вы в игре. Выберите действие.");
     }
 
-    // --- Логика обычных карт из предыдущего этапа ---
     public void PlayActionCard(CardData cardToPlay)
     {
         if (currentState != GameState.Playing) return;
@@ -141,44 +147,54 @@ public class GameManager : MonoBehaviour
         {
             currentMoney -= cardToPlay.moneyCost;
             currentDays -= cardToPlay.timeCostDays;
+            _attempts++;
 
             int roll = Random.Range(1, 21);
-            LogEvent($"Трата: {cardToPlay.cardName}. Бросок: {roll} (нужно {cardToPlay.targetRoll})");
+            bool success = roll >= cardToPlay.targetRoll;
 
-            if (roll >= cardToPlay.targetRoll)
+            if (success)
             {
-                LogEvent($"Успех! +{cardToPlay.rewardMoney}$");
+                _successes++;
                 currentMoney += cardToPlay.rewardMoney;
             }
-            else
-            {
-                LogEvent("Провал! Ресурсы потрачены зря.");
-            }
+
             UpdateUI();
+
+            string title = success ? "Успех!" : "Провал";
+            string body = $"{cardToPlay.cardName}\n\nБросок: {roll}  (нужно {cardToPlay.targetRoll})\n\n";
+            body += success ? $"+{cardToPlay.rewardMoney}$" : "Ресурсы потрачены зря.";
+
+            LogEvent(success
+                ? $"Успех! {cardToPlay.cardName}. Бросок: {roll}. +{cardToPlay.rewardMoney}$"
+                : $"Провал! {cardToPlay.cardName}. Бросок: {roll}.");
+
+            resultPopup.Show(title, body, onClose: CheckGameOver);
         }
         else
         {
-            LogEvent("Недостаточно ресурсов!");
+            resultPopup.Show("Нет ресурсов", $"Не хватает для: {cardToPlay.cardName}");
         }
+    }
+
+    private void CheckGameOver()
+    {
+        if (currentMoney >= targetMoney)
+            gameOverPanel.Show(true, currentMoney, _attempts, _successes);
+        else if (currentDays <= 0)
+            gameOverPanel.Show(false, currentMoney, _attempts, _successes);
     }
 
     private void LogEvent(string message)
     {
         eventLogText.text += $"- {message}\n\n";
-        
-        // Принудительно обновляем UI и мотаем вниз
         Canvas.ForceUpdateCanvases();
         if (logScrollRect != null)
-        {
             logScrollRect.verticalNormalizedPosition = 0f;
-        }
     }
 
     private void UpdateUI()
     {
         if (statsText != null)
-        {
             statsText.text = $"Деньги: {currentMoney}$ | Дней: {currentDays}";
-        }
     }
 }
