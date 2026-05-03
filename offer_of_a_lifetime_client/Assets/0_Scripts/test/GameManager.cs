@@ -35,7 +35,10 @@ public class GameManager : MonoBehaviour
 
     void Awake()
     {
-        Instance = this;
+        if (Instance == null)
+            Instance = this;
+        else
+            Destroy(gameObject);
     }
 
     void Start()
@@ -92,7 +95,7 @@ public class GameManager : MonoBehaviour
             {
                 LogEvent("Все карты открыты. Переходим к игре!");
                 // Здесь можно добавить кнопку "Начать", но пока переключаем автоматически
-                Invoke("StartPlayingPhase", 2f); // Задержка 2 секунды перед сменой экрана
+                Invoke(nameof(StartPlayingPhase), 2f);
             }
         }
         else
@@ -144,8 +147,8 @@ public class GameManager : MonoBehaviour
 
             if (roll >= cardToPlay.targetRoll)
             {
-                LogEvent("Успех! +100$");
-                currentMoney += 100; 
+                LogEvent($"Успех! +{cardToPlay.rewardMoney}$");
+                currentMoney += cardToPlay.rewardMoney;
             }
             else
             {

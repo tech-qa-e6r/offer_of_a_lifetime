@@ -18,4 +18,7 @@ public class CardData : ScriptableObject
     
     // Required d20 roll for success
     public int targetRoll;
+
+    // Money reward on success
+    public int rewardMoney;
 }
