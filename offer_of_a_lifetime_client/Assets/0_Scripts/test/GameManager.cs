@@ -46,8 +46,9 @@ public class GameManager : MonoBehaviour
         currentState = GameState.Setup;
         setupPanel.SetActive(true);
         actionPanel.SetActive(false);
-        
-        eventLogText.text = "Игра начата. Откройте 4 карты предыстории.\n\n";
+        logScrollRect.gameObject.SetActive(false);
+
+        eventLogText.text = "";
     }
 
     // Вызывается слотом при клике по рубашке
@@ -114,6 +115,7 @@ public class GameManager : MonoBehaviour
         currentState = GameState.Playing;
         setupPanel.SetActive(false);
         actionPanel.SetActive(true);
+        logScrollRect.gameObject.SetActive(true);
         LogEvent("Вы в игре. Выберите действие.");
     }
 
